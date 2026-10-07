@@ -5,23 +5,15 @@ export async function handler(event, context) {
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
-    const bodyData = JSON.parse(event.body);
 
-    // Otomatis rapikan format agar sesuai dengan standar Replicate API
-    const payload = {
-      version: bodyData.version || "3398edbc0fb619d8425255470d0322c3584852e9cb389778c187532d56a73c14",
-      input: bodyData.input || {
-        image: bodyData.imageUrl || bodyData.image
-      }
-    };
-
+    // Langsung teruskan data asli dari index.html ke Replicate tanpa diubah-ubah
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
         "Authorization": authHeader,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(payload)
+      body: event.body
     });
 
     const data = await response.json();
