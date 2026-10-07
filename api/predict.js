@@ -15,7 +15,7 @@ exports.handler = async function(event, context) {
       },
       body: JSON.stringify(bodyData)
     });
-
+const response = await fetch("/api/predict", { method: "POST", headers: { "Authorization": `Token ${apiToken}`, "Content-Type": "application/json", }, body: JSON.stringify({ version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a2e0b0ffde14a3043d", input: { image: imageBase64, fps: 6, motion_bucket_id: 127 } }) });
     const data = await response.json();
 
     return {
