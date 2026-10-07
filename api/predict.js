@@ -7,21 +7,16 @@ export async function handler(event, context) {
     const authHeader = event.headers.authorization || event.headers.Authorization;
     const bodyData = JSON.parse(event.body);
 
-    // Otomatis terjemahkan format agar sesuai dengan standar Replicate API
-    let payload = bodyData;
-    if (bodyData.imageUrl && !bodyData.input) {
-      payload = {
-        version: "3f0457e4619daac51203dedb472816fd4af51f3149fa7a2e0b0ffde14a3043d",
-        input: {
-          image: bodyData.imageUrl
-        }
-      };
-    } else if (!bodyData.version || !bodyData.input) {
-      payload = {
-        version: bodyData.version || "3f0457e4619daac51203dedb472816fd4af51f3149fa7a2e0b0ffde14a3043d",
-        input: bodyData.input || { image: bodyData.imageUrl || bodyData.image }
-      };
-    }
+    // Otomatis ubah format data agar kompatibel dengan standar Replicate
+    const payload = {
+      version: bodyData.version || "9f747673945c62801b13b8470217480629b954ee3651ac73efbc12c887f995cf",
+      input: {
+        image: bodyData.image || bodyData.imageUrl,
+        fps: bodyData.fps || 6,
+        motion_bucket_id: bodyData.motion_bucket_id || 127,
+        cond_aug: 0.02
+      }
+    };
 
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
