@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Image to Video Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background: #0f172a; color: #f8fafc; padding: 16px; display: flex; justify-content: center; min-height: 100vh; }
+    .card { background: #1e293b; padding: 20px; border-radius: 12px; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.4rem; margin-bottom: 16px; text-align: center; color: #38bdf8; }
+    label { display: block; margin-top: 14px; font-size: 0.85rem; color: #94a3b8; font-weight: 600; }
+    input, button { width: 100%; padding: 12px; margin-top: 6px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.9rem; }
+    button { background: #0284c7; font-weight: bold; cursor: pointer; margin-top: 20px; border: none; color: white; transition: 0.2s; }
+    button:hover { background: #0369a1; }
+    button:disabled { background: #475569; cursor: not-allowed; }
+    #status { margin-top: 15px; text-align: center; font-size: 0.85rem; color: #fbbf24; font-weight: 500; word-break: break-word; }
+    video { width: 100%; margin-top: 15px; border-radius: 8px; display: none; }
+    img { width: 100%; margin-top: 10px; border-radius: 8px; max-height: 220px; object-fit: contain; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎬 AI Image to Video (Vercel)</h1>
+
+    <label for="apiToken">Replicate API Token:</label>
+    <input type="password" id="apiToken" placeholder="r8_xxxxxxxxxxxxxxxxxxxx">
+
+    <label for="imageInput">Pilih Gambar dari HP:</label>
+    <input type="file" id="imageInput" accept="image/*">
+    <img id="imagePreview" alt="Preview Gambar">
+
+    <button id="generateBtn" onclick="generateVideo()">Mulai Buat Video 🚀</button>
+
+    <div id="status"></div>
+    <video id="videoResult" controls autoplay loop></video>
+  </div>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const imagePreview = document.getElementById('imagePreview');
+    let selectedFile = null;
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        selectedFile = file;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          imagePreview.src = evt.target.result;
+          imagePreview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    async function generateVideo() {
+      const token = document.getElementById('apiToken').value.trim();
+      const status = document.getElementById('status');
+      const videoResult = document.getElementById('videoResult');
+      const btn = document.getElementById('generateBtn');
+
+      if (!token) return alert('Masukkan Replicate API Token milikmu!');
+      if (!selectedFile) return alert('Pilih gambar terlebih dahulu!');
+
+      btn.disabled = true;
+      videoResult.style.display = 'none';
+
+      try {
+        status.innerText = '📤 Mengunggah gambar...';
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        const uploadRes = await fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadRes.ok) throw new Error('Gagal mengunggah gambar.');
+
+        const uploadData = await uploadRes.json();
+        let imageUrl = uploadData.data.url.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+
+        status.innerText = '🤖 Menghubungi Replicate AI...';
+
+        const response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ imageUrl: imageUrl })
+        });
+
+        const data = await response.json();
+
+        if (data.error || data.detail) {
+          throw new Error(data.error || data.detail || 'Gagal memproses video.');
+        }
+
+        const predictionId = data.id;
+        status.innerText = '⏳ Video sedang diproses AI (~1-2 menit). Mohon tunggu...';
+
+        const checkInterval = setInterval(async () => {
+          try {
+            const pollRes = await fetch(`/api/predict?id=${predictionId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const pollData = await pollRes.json();
+
+            if (pollData.status === 'succeeded') {
+              clearInterval(checkInterval);
+              status.innerText = '🎉 Video Berhasil Dibuat!';
+              const videoUrl = Array.isArray(pollData.output) ? pollData.output[0] : pollData.output;
+              videoResult.src = videoUrl;
+              videoResult.style.display = 'block';
+              btn.disabled = false;
+            } else if (pollData.status === 'failed' || pollData.status === 'canceled') {
+              clearInterval(checkInterval);
+              status.innerText = '❌ Gagal: ' + (pollData.error || 'Proses dibatalkan.');
+              btn.disabled = false;
+            } else {
+              status.innerText = `⏳ Sedang diproses AI... (${pollData.status})`;
+            }
+          } catch (e) {
+            console.log('Retrying poll...');
+          }
+        }, 4000);
+
+      } catch (err) {
+        status.innerText = '❌ Error: ' + err.message;
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
